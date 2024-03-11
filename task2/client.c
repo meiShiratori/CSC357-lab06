@@ -4,7 +4,7 @@
 #include <netdb.h>
 #include <unistd.h>
 
-#define PORT 2828
+#define PORT 49152
 
 #define MIN_ARGS 2
 #define MAX_ARGS 2
@@ -26,71 +26,79 @@ void validate_arguments(int argc, char *argv[])
     }
 }
 
-void send_request(int fd)
+void send_and_receive_echo(int fd)
 {
-   char *line = NULL;
-   size_t size;
-   ssize_t num;
+    char *line = NULL;
+    size_t size;
+    ssize_t num;
 
-   while ((num = getline(&line, &size, stdin)) >= 0)
-   {
-      write(fd, line, num);
-   }
+    while ((num = getline(&line, &size, stdin)) >= 0)
+    {
+        write(fd, line, num);
 
-   free(line);
+
+        char buffer[1024];
+        ssize_t received = read(fd, buffer, sizeof(buffer) - 1);
+        if (received > 0) {
+            buffer[received] = '\0';
+            printf("%s", buffer);
+        }
+    }
+
+    free(line);
 }
 
 int connect_to_server(struct hostent *host_entry)
 {
-   int fd;
-   struct sockaddr_in their_addr;
+    int fd;
+    struct sockaddr_in their_addr;
 
-   if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-   {
-      return -1;
-   }
-   
-   their_addr.sin_family = AF_INET;
-   their_addr.sin_port = htons(PORT);
-   their_addr.sin_addr = *((struct in_addr *)host_entry->h_addr);
+    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        return -1;
+    }
 
-   if (connect(fd, (struct sockaddr *)&their_addr,
-      sizeof(struct sockaddr)) == -1)
-   {
-      close(fd);
-      perror(0);
-      return -1;
-   }
+    their_addr.sin_family = AF_INET;
+    their_addr.sin_port = htons(PORT);
+    their_addr.sin_addr = *((struct in_addr *)host_entry->h_addr);
 
-   return fd;
+    if (connect(fd, (struct sockaddr *)&their_addr,
+                sizeof(struct sockaddr)) == -1)
+    {
+        close(fd);
+        perror(0);
+        return -1;
+    }
+
+    return fd;
 }
 
 struct hostent *gethost(char *hostname)
 {
-   struct hostent *he;
+    struct hostent *he;
 
-   if ((he = gethostbyname(hostname)) == NULL)
-   {
-      herror(hostname);
-   }
+    if ((he = gethostbyname(hostname)) == NULL)
+    {
+        herror(hostname);
+    }
 
-   return he;
+    return he;
 }
 
 int main(int argc, char *argv[])
 {
-   validate_arguments(argc, argv);
-   struct hostent *host_entry = gethost(argv[SERVER_ARG_IDX]);
+    validate_arguments(argc, argv);
+    struct hostent *host_entry = gethost(argv[SERVER_ARG_IDX]);
 
-   if (host_entry)
-   {
-      int fd = connect_to_server(host_entry);
-      if (fd != -1)
-      {
-         send_request(fd);
-         close(fd);
-      }
-   }
+    if (host_entry)
+    {
+        int fd = connect_to_server(host_entry);
+        if (fd != -1)
+        {
+            send_and_receive_echo(fd);
+            close(fd);
+        }
+    }
 
-   return 0;
+    return 0;
 }
